@@ -47,34 +47,7 @@ const formatPreviousPerformanceString = (loggedSets) => { /* ... as before ... *
 
 // --- MODAL COMPONENT ---
 const Modal = ({ isOpen, onClose, title, children, showCancelButton = false, onConfirm, confirmText = "OK", cancelText = "Cancel" }) => { /* ... as before ... */ if (!isOpen) return null; return ( <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-[100] p-4"><div className="bg-gray-800 p-6 rounded-lg shadow-xl w-full max-w-md"><div className="flex justify-between items-center mb-4"><h2 className="text-xl font-semibold text-pink-400">{title}</h2><button onClick={onClose} className="text-gray-400 hover:text-gray-200"><XCircle size={24} /></button></div><div className="mb-6">{children}</div><div className={`flex ${showCancelButton ? 'justify-between' : 'justify-end'} space-x-3`}>{showCancelButton && ( <button onClick={onClose} className="bg-gray-600 hover:bg-gray-500 text-white font-semibold py-2 px-4 rounded-lg transition-colors">{cancelText}</button>)}<button onClick={onConfirm || onClose} className={`${onConfirm ? 'bg-pink-600 hover:bg-pink-700' : 'bg-blue-600 hover:bg-blue-700'} text-white font-semibold py-2 px-4 rounded-lg transition-colors`}>{confirmText}</button></div></div></div> );};
-
-// --- LOGIN SCREEN COMPONENT ---
-const LoginScreen = React.memo(({ onSignInWithGoogle }) => (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-gray-900 p-4">
-        <div className="bg-gray-800 p-8 md:p-12 rounded-xl shadow-2xl text-center">
-            <Dumbbell size={64} className="text-pink-500 mx-auto mb-6" />
-            <h1 className="text-4xl font-bold text-pink-500 mb-4">FitTrack</h1>
-            <p className="text-gray-400 mb-8 text-lg">Log your workouts and track your progress.</p>
-            <button
-                onClick={onSignInWithGoogle}
-                className="bg-white hover:bg-gray-100 text-gray-700 font-semibold py-3 px-6 rounded-lg text-lg flex items-center justify-center w-full transition-colors duration-150 shadow-md"
-            >
-                {/* Updated Google Logo SVG */}
-                <svg className="w-5 h-5 mr-3" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
-                    <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"></path>
-                    <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"></path>
-                    <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"></path>
-                    <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"></path>
-                    <path fill="none" d="M0 0h48v48H0z"></path>
-                </svg>
-                Sign in with Google
-            </button>
-        </div>
-        <p className="text-gray-500 text-sm mt-8">
-            By signing in, you agree to our imaginary Terms of Service.
-        </p>
-    </div>
-));
+const LoginScreen = React.memo(({ onSignInWithGoogle }) => ( /* ... as before ... */ <div className="flex flex-col items-center justify-center min-h-screen bg-gray-900 p-4"><div className="bg-gray-800 p-8 md:p-12 rounded-xl shadow-2xl text-center"><Dumbbell size={64} className="text-pink-500 mx-auto mb-6" /><h1 className="text-4xl font-bold text-pink-500 mb-4">FitTrack</h1><p className="text-gray-400 mb-8 text-lg">Log your workouts and track your progress.</p><button onClick={onSignInWithGoogle} className="bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-6 rounded-lg text-lg flex items-center justify-center w-full transition-colors duration-150"><svg className="w-6 h-6 mr-3" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M22.56,12.25C22.56,11.47 22.49,10.72 22.36,10H12V14.26H17.94C17.63,15.91 16.77,17.31 15.32,18.25V21.09H19.16C21.32,19.16 22.56,15.97 22.56,12.25Z"/></svg> Sign in with Google</button></div><p className="text-gray-500 text-sm mt-8">By signing in, you agree to our imaginary Terms of Service.</p></div>));
 
 // --- SCREEN COMPONENTS ---
 const HomeScreen = React.memo(({ workouts, onStartWorkout, onEditWorkoutTemplate, onDeleteWorkoutTemplate, onCreateNewWorkout, onWorkoutPlanDragStart, onWorkoutPlanDragOver, onWorkoutPlanDrop, onWorkoutPlanDragEnd }) => ( <div className="p-4 md:p-6"><h1 className="text-3xl font-bold mb-6 text-center text-pink-500">My Workouts</h1><div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">{workouts.map((workout, index) => (<div key={workout.id} id={`workout-plan-${workout.id}`} draggable="true" onDragStart={(e) => onWorkoutPlanDragStart(e, index)} onDragOver={onWorkoutPlanDragOver} onDrop={(e) => onWorkoutPlanDrop(e, index)} onDragEnd={onWorkoutPlanDragEnd} className="bg-gray-800 p-4 rounded-lg shadow-md hover:shadow-lg transition-shadow cursor-grab active:cursor-grabbing relative"><div className="absolute top-2 right-2 text-gray-500 opacity-50 hover:opacity-100"><GripVertical size={20} /></div><h2 className="text-xl font-semibold mb-2 text-pink-400">{workout.name}</h2><ul className="text-sm text-gray-400 mb-3 list-disc list-inside">{(workout.exercises || []).slice(0,3).map(ex => (<li key={ex.id}>{ex.name} ({ex.targetSets}x{formatRepRange(ex.targetRepsMin, ex.targetRepsMax)} {ex.targetWeight ? `@ ${ex.targetWeight}lbs` : ''})</li>))}{(workout.exercises || []).length > 3 && <li>...and more</li>}</ul><div className="flex justify-between items-center mt-auto pt-2"><button onClick={() => onStartWorkout(workout)} className="bg-pink-600 hover:bg-pink-700 text-white font-semibold py-2 px-4 rounded-lg flex items-center transition-colors"><Play size={18} className="mr-2" /> Start</button><div><button onClick={() => onEditWorkoutTemplate(workout)} className="text-blue-400 hover:text-blue-300 mr-2 p-1"><Edit3 size={18}/></button><button onClick={() => onDeleteWorkoutTemplate(workout.id)} className="text-red-400 hover:text-red-300 p-1"><Trash2 size={18}/></button></div></div></div>))}{workouts.length === 0 && <p className="text-gray-400 col-span-full text-center py-8">No workout plans yet. Create one to get started!</p>}</div><button onClick={onCreateNewWorkout} className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg flex items-center justify-center text-lg transition-colors"><PlusCircle size={22} className="mr-2" /> Create New Workout Plan</button></div>));
@@ -219,7 +192,7 @@ function App() {
                 // Consider reverting optimistic update or re-fetching data on error
             }
         }
-    }, [workouts, db, userId, showInfoModal, appId]);
+    }, [workouts, db, userId, showInfoModal]);
 
     const handleWorkoutPlanDragEnd = useCallback((e) => {
         if (e.currentTarget) {
