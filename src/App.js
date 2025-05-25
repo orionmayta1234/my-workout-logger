@@ -17,7 +17,7 @@ import {
     query, 
     onSnapshot, 
     deleteDoc, 
-    serverTimestamp, 
+    // serverTimestamp, // No longer used for workoutLog start/end times
     writeBatch 
 } from 'firebase/firestore';
 import { 
@@ -42,8 +42,7 @@ import {
     SET_TYPES, 
     DEFAULT_EXERCISE, 
     formatPreviousPerformanceString 
-    // formatRepRange and formatSetTarget are used by components, they should import it if needed
-} from './utils/helpers'; // Adjust path if your utils folder is elsewhere
+} from './utils/helpers'; 
 
 // --- Firebase Configuration ---
 const firebaseConfig = {
@@ -142,7 +141,7 @@ function App() {
     const handleSaveWorkoutTemplate = useCallback(async () => { if (!editingWorkout) { showInfoModal("No workout data to save."); return; } if (!editingWorkout.name.trim()) { showInfoModal("Workout Plan Name is required."); return; } const emptyExercise = editingWorkout.exercises.find(ex => !ex.name.trim()); if (emptyExercise) { showInfoModal(`All exercises must have a name. Exercise #${editingWorkout.exercises.indexOf(emptyExercise) + 1} is missing a name.`); return; } if (!db || !userId) { showInfoModal("Cannot save: Database connection or User ID is missing."); return; } const workoutToSave = { ...editingWorkout, exercises: editingWorkout.exercises.filter(ex => ex.name.trim() !== '') }; if(typeof workoutToSave.order === 'undefined') { workoutToSave.order = workouts.length > 0 ? Math.max(...workouts.map(w => w.order || 0)) + 1 : 0; } try { const workoutsCollectionPath = `artifacts/${appId}/users/${userId}/workouts`; if (workoutToSave.id) { await setDoc(doc(db, workoutsCollectionPath, workoutToSave.id), workoutToSave, { merge: true }); } else { const { id, ...dataForNewWorkout } = workoutToSave; await addDoc(collection(db, workoutsCollectionPath), dataForNewWorkout); } setEditingWorkout(null); setCurrentScreen('home'); } catch (error) { console.error("Error saving workout template:", error); showInfoModal("Error saving workout: " + ( String(error.message) || "Unknown error")); } }, [db, userId, editingWorkout, showInfoModal, workouts]);
     const requestDeleteWorkoutTemplate = useCallback((workoutId) => { setItemToDelete({ id: workoutId, type: 'template' }); setConfirmModalMessage("Are you sure you want to delete this workout plan? This action cannot be undone."); setIsConfirmModalOpen(true); }, []);
     const handleWorkoutNameChange = useCallback((newName) => { setEditingWorkout(prev => ({ ...prev, name: newName })); }, []);
-    const handleExerciseChange = useCallback((exerciseIndex, field, value) => { setEditingWorkout(prev => ({ ...prev, exercises: prev.exercises.map((ex, i) => i === exerciseIndex ? { ...ex, [field]: value } : ex) })); }, []);
+    const handleExerciseChange = useCallback((exerciseIndex, field, value) => { setEditingWorkout(prev => ({ ...prev, exercises: prev.exercises.map((ex, i) => i === exerciseIndex ? { ...ex, [field]: field === 'supersetWithNext' ? !ex.supersetWithNext : value } : ex) })); }, []);
     const addExerciseToTemplate = useCallback(() => { setEditingWorkout(prev => ({ ...prev, exercises: [...prev.exercises, { ...DEFAULT_EXERCISE, id: generateId() }] })); }, []);
     const removeExerciseFromTemplate = useCallback((exerciseId) => { setEditingWorkout(prev => ({ ...prev, exercises: prev.exercises.filter(ex => ex.id !== exerciseId) })); }, []);
     
@@ -171,9 +170,54 @@ function App() {
     const handleStartReplaceExercise = useCallback((exerciseIndex, currentName) => { setReplacingExerciseIndex(exerciseIndex); setTempReplaceName(currentName); }, []);
     const handleConfirmReplaceExercise = useCallback((exerciseIndex) => { if (!tempReplaceName.trim()) { showInfoModal("New exercise name cannot be empty."); return; } setActiveWorkout(prevWorkout => { const newExercises = prevWorkout.exercises.map((ex, idx) => { if (idx === exerciseIndex) { return { ...ex, name: tempReplaceName }; } return ex; }); return { ...prevWorkout, exercises: newExercises }; }); setReplacingExerciseIndex(null); setTempReplaceName(''); }, [tempReplaceName, showInfoModal]);
     const handleCancelReplaceExercise = useCallback(() => { setReplacingExerciseIndex(null); setTempReplaceName(''); }, []);
-    const handleLogSet = useCallback((exerciseIndex, setIndex, setData) => { setActiveWorkout(prev => { const updatedWorkout = { ...prev }; updatedWorkout.exercises[exerciseIndex].loggedSets[setIndex] = { ...updatedWorkout.exercises[exerciseIndex].loggedSets[setIndex], ...setData, completed: true }; return updatedWorkout; }); startTimer(); }, [startTimer]);
+    
+    const handleLogSet = useCallback((exerciseIndex, setIndex, setData) => {
+        setActiveWorkout(prevWorkout => {
+            if (!prevWorkout) return null;
+    
+            const updatedExercises = prevWorkout.exercises.map((ex, exIdx) => {
+                if (exIdx === exerciseIndex) {
+                    const updatedLoggedSets = ex.loggedSets.map((s, sIdx) => {
+                        if (sIdx === setIndex) {
+                            return { ...s, ...setData, completed: true };
+                        }
+                        return s;
+                    });
+                    return { ...ex, loggedSets: updatedLoggedSets };
+                }
+                return ex;
+            });
+            
+            const currentExercise = updatedExercises[exerciseIndex];
+            const numTargetSets = parseInt(currentExercise.targetSets, 10) || 0;
+            const completedSetsForCurrentExercise = currentExercise.loggedSets.filter(s => s.completed).length;
+            const allSetsForCurrentExerciseDone = completedSetsForCurrentExercise >= numTargetSets;
+    
+            let shouldStartMainRestTimer = true;
+            let showSupersetMessage = false;
+    
+            if (currentExercise.supersetWithNext) {
+                if (allSetsForCurrentExerciseDone) {
+                    shouldStartMainRestTimer = false; 
+                    showSupersetMessage = true;
+                }
+                // If not all sets are done for THIS exercise in the superset, timer will run (shouldStartMainRestTimer is true)
+            }
+            // If it's not supersetWithNext (standalone or last in a superset), timer always runs.
+    
+            if (shouldStartMainRestTimer) {
+                startTimer(); 
+            } else if (showSupersetMessage) {
+                const nextExerciseName = updatedExercises[exerciseIndex + 1]?.name || "the next exercise";
+                showInfoModal(`Superset: Move to ${nextExerciseName}! No long rest.`);
+            }
+            
+            return { ...prevWorkout, exercises: updatedExercises };
+        });
+    }, [startTimer, showInfoModal]);
+
     const handleAddSetToExercise = useCallback((exerciseIndex) => { setActiveWorkout(prevWorkout => { const newExercises = prevWorkout.exercises.map((exercise, exIdx) => { if (exIdx === exerciseIndex) { const newLoggedSets = [...exercise.loggedSets, { reps: '', weight: '', completed: false, durationAchieved: null, drops: exercise.setType === SET_TYPES.DROPSET ? Array((exercise.drops || []).length).fill({reps:'', weight:''}) : null }]; return { ...exercise, loggedSets: newLoggedSets }; } return exercise; }); return { ...prevWorkout, exercises: newExercises }; }); }, []);
-    const handleSetInputChange = useCallback((exerciseIndex, setIndex, field, value, dropIndex = null) => { setActiveWorkout(prevWorkout => { const newExercises = prevWorkout.exercises.map((exercise, exIdx) => { if (exIdx === exerciseIndex) { const newLoggedSets = exercise.loggedSets.map((set, sIdx) => { if (sIdx === setIndex) { if (field === 'drops' && dropIndex !== null) { const updatedDrops = (set.drops || Array((exercise.drops || []).length).fill({})).map((d, di) => di === dropIndex ? { ...d, ...value } : d); return { ...set, drops: updatedDrops }; } return { ...set, [field]: value }; } return set; }); return { ...exercise, loggedSets: newLoggedSets }; } return exercise; }); return { ...prevWorkout, exercises: newExercises }; }); }, []);
+    const handleSetInputChange = useCallback((exerciseIndex, setIndex, field, value, dropIndex = null) => { setActiveWorkout(prevWorkout => { const newExercises = prevWorkout.exercises.map((exercise, exIdx) => { if (exIdx === exerciseIndex) { const newLoggedSets = exercise.loggedSets.map((set, sIdx) => { if (sIdx === setIndex) { if (field === 'drops' && dropIndex !== null && typeof value === 'object') { const updatedDrops = (set.drops || Array((exercise.drops || []).length).fill({})).map((d, di) => di === dropIndex ? {...d, ...value } : d); return { ...set, drops: updatedDrops }; } return { ...set, [field]: value }; } return set; }); return { ...exercise, loggedSets: newLoggedSets }; } return exercise; }); return { ...prevWorkout, exercises: newExercises }; }); }, []);
     const handleFinishWorkout = useCallback(async () => { if (!db || !userId || !activeWorkout) return; const finalBodyWeight = bodyWeight || activeWorkout.bodyWeight || ''; const finalNotes = workoutNotes || activeWorkout.notes || ''; const workoutLog = { ...activeWorkout, bodyWeight: finalBodyWeight, notes: finalNotes, endTime: new Date(), isCompleted: true, exercises: activeWorkout.exercises.map(ex => ({ ...ex, loggedSets: ex.loggedSets.filter(s => s.completed || ex.isSkipped) })) }; try { await addDoc(collection(db, `artifacts/${appId}/users/${userId}/workoutLogs`), workoutLog); setActiveWorkout(null); setCurrentScreen('home'); stopTimer(); setBodyWeight(''); setWorkoutNotes(''); setShowBodyWeightInput(false); } catch (error) { console.error("Error finishing workout:", error); showInfoModal("Error saving workout log: " + (String(error.message) || "Unknown error")); } }, [db, userId, activeWorkout, bodyWeight, workoutNotes, stopTimer, showInfoModal]);
     const handleCancelActiveWorkout = useCallback(() => { setActiveWorkout(null); setCurrentScreen('home'); stopTimer(); setReplacingExerciseIndex(null); setTempReplaceName(''); }, [stopTimer]);
     const handleCancelCreateEdit = useCallback(() => { setEditingWorkout(null); setCurrentScreen('home'); }, []);

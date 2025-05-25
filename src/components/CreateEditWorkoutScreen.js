@@ -1,9 +1,9 @@
 import React from 'react';
-import { PlusCircle, Trash2, Save, XCircle, GripVertical } from 'lucide-react';
+import { PlusCircle, Trash2, Save, XCircle, GripVertical, Link2 } from 'lucide-react';
 
 // It's highly recommended to move SET_TYPES to a shared utility file (e.g., src/utils/constants.js or src/utils/helpers.js)
 // and import it here and in App.js to avoid duplication.
-// For this standalone component, I'm defining it here for clarity.
+// For this standalone component, I'm defining it here for clarity if not already moved.
 const SET_TYPES = {
     STANDARD: 'standard',
     WARMUP: 'warmup',
@@ -62,7 +62,7 @@ const CreateEditWorkoutScreen = React.memo(({
                             onDrop={(e) => onExerciseDrop(e, index)}
                             onDragEnd={onExerciseDragEnd}
                             onTouchStart={(e) => onExerciseTouchStart(e, index)}
-                            // onTouchMove and onTouchEnd are typically handled by document listeners set up in onTouchStart
+                            // onTouchMove and onTouchEnd are typically handled by document listeners set up in onTouchStart in App.js
                             className="exercise-item bg-gray-700 p-4 rounded-md mb-4 border border-gray-600 cursor-grab active:cursor-grabbing flex items-start space-x-3"
                         >
                             <div className="pt-1 text-gray-500 opacity-70 hover:opacity-100 touch-none"> {/* touch-none for drag handle */}
@@ -139,6 +139,22 @@ const CreateEditWorkoutScreen = React.memo(({
                                         </div>
                                     )}
                                 </div>
+                                {/* Superset Toggle Checkbox */}
+                                {index < (editingWorkout.exercises || []).length - 1 && (
+                                    <div className="mt-3 pt-3 border-t border-gray-600">
+                                        <label htmlFor={`superset-${exercise.id}`} className="flex items-center space-x-2 text-sm text-gray-300 cursor-pointer">
+                                            <input
+                                                type="checkbox"
+                                                id={`superset-${exercise.id}`}
+                                                checked={!!exercise.supersetWithNext}
+                                                onChange={() => onExerciseChange(index, 'supersetWithNext', !exercise.supersetWithNext)}
+                                                className="form-checkbox h-4 w-4 text-pink-600 bg-gray-600 border-gray-500 rounded focus:ring-pink-500"
+                                            />
+                                            <span>Superset with next exercise</span>
+                                            {exercise.supersetWithNext && <Link2 size={16} className="text-pink-500 inline-block ml-1" />}
+                                        </label>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     ))}

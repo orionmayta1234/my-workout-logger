@@ -18,6 +18,7 @@ export const DEFAULT_EXERCISE = {
     targetWeight: '',
     targetDuration: 60,
     drops: [{ weight: '', reps: '' }],
+    supersetWithNext: false,
 };
 
 export const generateId = () => Math.random().toString(36).substr(2, 9);

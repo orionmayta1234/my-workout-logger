@@ -1,8 +1,9 @@
 import React from 'react';
-import { XCircle, CheckCircle, PlusCircle, Replace, SkipForward, History, RotateCcw } from 'lucide-react';
+import { XCircle, CheckCircle, PlusCircle, Replace, SkipForward, History, RotateCcw, Link2 } from 'lucide-react';
 
-// It's highly recommended to move SET_TYPES and formatSetTarget to a shared utility file
-// and import them here and in App.js to avoid duplication.
+// It's highly recommended to move SET_TYPES, formatRepRange, and formatSetTarget
+// to a shared utility file (e.g., src/utils/helpers.js) and import them here.
+// For this standalone component, placeholders are included.
 const SET_TYPES = {
     STANDARD: 'standard',
     WARMUP: 'warmup',
@@ -11,7 +12,6 @@ const SET_TYPES = {
     TIMED: 'timed',
 };
 
-// Placeholder for formatRepRange if not imported, used by formatSetTarget
 const formatRepRange = (min, max) => {
     const minReps = parseInt(min, 10);
     const maxReps = parseInt(max, 10);
@@ -97,108 +97,123 @@ const ActiveWorkoutScreen = React.memo(({
                 </div>
             )}
 
-            {activeWorkout.exercises.map((exercise, exIndex) => (
-                <div key={exercise.id} className={`bg-gray-800 p-4 rounded-lg shadow-md mb-4 ${exercise.isSkipped ? 'opacity-50' : ''}`}>
-                    <div className="flex justify-between items-start mb-1">
-                        <div>
-                            <h2 className="text-xl font-semibold text-pink-400">{exercise.name} <span className="text-xs uppercase text-gray-500 ml-1">({exercise.setType})</span></h2>
-                            {exercise.previousPerformance && (
-                                <div className="text-xs text-gray-500 mt-0.5 mb-1 flex items-center">
-                                    <History size={12} className="mr-1 flex-shrink-0" />Previously: {exercise.previousPerformance}
-                                </div>
-                            )}
-                            {!exercise.previousPerformance && (
-                                 <div className="text-xs text-gray-500 mt-0.5 mb-1 flex items-center">
-                                    <History size={12} className="mr-1 flex-shrink-0" />No previous data for this exercise in this plan.
-                                </div>
-                            )}
-                            <span className="text-sm text-gray-400 block">
-                                Target: {exercise.targetSets}x {formatSetTarget(exercise)} {exercise.targetWeight && exercise.setType !== SET_TYPES.TIMED && exercise.setType !== SET_TYPES.DROPSET ? `@ ${exercise.targetWeight}lbs` : ''}
-                            </span>
-                        </div>
-                        <div className="flex space-x-1 mt-1">
-                            {replacingExerciseIndex !== exIndex && !exercise.isSkipped && (
-                                <button onClick={() => onStartReplaceExercise(exIndex, exercise.name)} className="p-1 text-blue-400 hover:text-blue-300" title="Replace Exercise"><Replace size={16}/></button>
-                            )}
-                            <button onClick={() => onToggleSkipExercise(exIndex)} className={`p-1 ${exercise.isSkipped ? 'text-yellow-400 hover:text-yellow-300' : 'text-gray-400 hover:text-gray-300'}`} title={exercise.isSkipped ? "Unskip Exercise" : "Skip Exercise"}>
-                                <SkipForward size={16}/>
-                            </button>
-                        </div>
-                    </div>
-
-                    {replacingExerciseIndex === exIndex && (
-                        <div className="my-2 p-2 bg-gray-700 rounded">
-                            <input type="text" value={tempReplaceName} onChange={(e) => onSetTempReplaceName(e.target.value)} placeholder="New exercise name" className="w-full bg-gray-600 text-white p-2 rounded mb-2 text-sm" autoFocus/>
-                            <div className="flex justify-end space-x-2">
-                                <button onClick={onCancelReplaceExercise} className="text-xs bg-gray-500 hover:bg-gray-400 px-2 py-1 rounded">Cancel</button>
-                                <button onClick={() => onConfirmReplaceExercise(exIndex)} className="text-xs bg-green-600 hover:bg-green-500 px-2 py-1 rounded">Confirm</button>
+            {(activeWorkout.exercises || []).map((exercise, exIndex) => {
+                // Determine if the previous exercise was part of a superset with this one
+                const isContinuationOfSuperset = exIndex > 0 && activeWorkout.exercises[exIndex - 1].supersetWithNext;
+                const cardStyle = exercise.supersetWithNext || isContinuationOfSuperset ? 'border-l-4 border-pink-500 pl-3 relative' : '';
+                
+                return (
+                    <div key={exercise.id} className={`bg-gray-800 p-4 rounded-lg shadow-md mb-4 ${exercise.isSkipped ? 'opacity-50' : ''} ${cardStyle}`}>
+                        {/* Display "SUPERSET START" only for the first item of a new superset group */}
+                        {exercise.supersetWithNext && !isContinuationOfSuperset && (
+                             <div className="text-xs text-pink-400 mb-1 font-semibold absolute -top-2 left-0 bg-gray-800 px-1">SUPERSET</div>
+                        )}
+                        <div className="flex justify-between items-start mb-1">
+                            <div>
+                                <h2 className="text-xl font-semibold text-pink-400 flex items-center">
+                                    {exercise.name}
+                                    <span className="text-xs uppercase text-gray-500 ml-2 bg-gray-700 px-1.5 py-0.5 rounded">{exercise.setType}</span>
+                                    {exercise.supersetWithNext && <Link2 size={14} className="ml-2 text-pink-500" title="Superset with next"/>}
+                                </h2>
+                                {exercise.previousPerformance && (
+                                    <div className="text-xs text-gray-500 mt-0.5 mb-1 flex items-center">
+                                        <History size={12} className="mr-1 flex-shrink-0" />Previously: {exercise.previousPerformance}
+                                    </div>
+                                )}
+                                {!exercise.previousPerformance && (
+                                     <div className="text-xs text-gray-500 mt-0.5 mb-1 flex items-center">
+                                        <History size={12} className="mr-1 flex-shrink-0" />No previous data for this exercise in this plan.
+                                    </div>
+                                )}
+                                <span className="text-sm text-gray-400 block">
+                                    Target: {exercise.targetSets}x {formatSetTarget(exercise)} {exercise.targetWeight && exercise.setType !== SET_TYPES.TIMED && exercise.setType !== SET_TYPES.DROPSET ? `@ ${exercise.targetWeight}lbs` : ''}
+                                </span>
+                            </div>
+                            <div className="flex space-x-1 mt-1">
+                                {replacingExerciseIndex !== exIndex && !exercise.isSkipped && (
+                                    <button onClick={() => onStartReplaceExercise(exIndex, exercise.name)} className="p-1 text-blue-400 hover:text-blue-300" title="Replace Exercise"><Replace size={16}/></button>
+                                )}
+                                <button onClick={() => onToggleSkipExercise(exIndex)} className={`p-1 ${exercise.isSkipped ? 'text-yellow-400 hover:text-yellow-300' : 'text-gray-400 hover:text-gray-300'}`} title={exercise.isSkipped ? "Unskip Exercise" : "Skip Exercise"}>
+                                    <SkipForward size={16}/>
+                                </button>
                             </div>
                         </div>
-                    )}
 
-                    {!exercise.isSkipped && exercise.loggedSets.map((set, setIndex) => (
-                        <div key={`${exercise.id}-set-${setIndex}`} className={`p-3 rounded-md mb-2 ${set.completed ? 'bg-green-800 border-green-600' : 'bg-gray-700 border-gray-600'} border`}>
-                            { (exercise.setType === SET_TYPES.STANDARD || exercise.setType === SET_TYPES.WARMUP || exercise.setType === SET_TYPES.AMRAP) && (
-                                <div className="flex items-center space-x-2">
-                                    <span className="text-gray-300 font-medium w-8 text-center">Set {setIndex + 1}</span>
-                                    <input type="number" placeholder="Reps" value={set.reps} onChange={(e) => onSetInputChange(exIndex, setIndex, 'reps', e.target.value)} className="bg-gray-600 text-white border border-gray-500 rounded-full w-20 h-12 text-center text-lg"/>
-                                    <span className="text-gray-400">x</span>
-                                    <input type="number" placeholder="lbs" value={set.weight} onChange={(e) => onSetInputChange(exIndex, setIndex, 'weight', e.target.value)} className="bg-gray-600 text-white border border-gray-500 rounded-full w-20 h-12 text-center text-lg"/>
-                                    {!set.completed && (set.reps || set.weight) && (
-                                        <button onClick={() => onLogSet(exIndex, setIndex, {reps: set.reps, weight: set.weight})} className="bg-green-500 hover:bg-green-600 text-white p-2 rounded-full" title="Log Set"><CheckCircle size={20} /></button>
-                                    )}
-                                    {set.completed && (
-                                        <button onClick={() => onUnlogSet(exIndex, setIndex)} className="bg-yellow-500 hover:bg-yellow-600 text-white p-2 rounded-full" title="Unlog Set"><RotateCcw size={20} /></button>
-                                    )}
+                        {replacingExerciseIndex === exIndex && (
+                            <div className="my-2 p-2 bg-gray-700 rounded">
+                                <input type="text" value={tempReplaceName} onChange={(e) => onSetTempReplaceName(e.target.value)} placeholder="New exercise name" className="w-full bg-gray-600 text-white p-2 rounded mb-2 text-sm" autoFocus/>
+                                <div className="flex justify-end space-x-2">
+                                    <button onClick={onCancelReplaceExercise} className="text-xs bg-gray-500 hover:bg-gray-400 px-2 py-1 rounded">Cancel</button>
+                                    <button onClick={() => onConfirmReplaceExercise(exIndex)} className="text-xs bg-green-600 hover:bg-green-500 px-2 py-1 rounded">Confirm</button>
                                 </div>
-                            )}
-                            {exercise.setType === SET_TYPES.TIMED && (
-                                <div className="flex flex-col items-center space-y-2">
-                                    <span className="text-gray-300 font-medium">Set {setIndex + 1}: Target {exercise.targetDuration}s</span>
-                                    {inSetTimer && inSetTimer.exerciseIndex === exIndex && inSetTimer.setIndex === setIndex ? (
-                                        <div className="text-2xl text-pink-400">{formatTime(inSetTimer.secondsLeft)}</div>
-                                    ) : (
-                                        <input type="number" placeholder="Actual (s)" value={set.durationAchieved || ''} onChange={(e) => onSetInputChange(exIndex, setIndex, 'durationAchieved', e.target.value)} className="bg-gray-600 text-white border border-gray-500 rounded-full w-24 h-10 text-center"/>
-                                    )}
-                                    {!set.completed && !(inSetTimer && inSetTimer.exerciseIndex === exIndex && inSetTimer.setIndex === setIndex) && (
-                                        <button onClick={() => onStartInSetTimer(exIndex, setIndex, exercise.targetDuration)} className="bg-blue-500 hover:bg-blue-600 text-white py-1 px-3 rounded-md text-sm">Start Set Timer</button>
-                                    )}
-                                    {!set.completed && (set.durationAchieved) && (
-                                        <button onClick={() => onLogSet(exIndex, setIndex, {durationAchieved: set.durationAchieved})} className="bg-green-500 hover:bg-green-600 text-white p-2 rounded-full" title="Log Timed Set"><CheckCircle size={20} /></button>
-                                    )}
-                                    {set.completed && (
-                                        <button onClick={() => onUnlogSet(exIndex, setIndex)} className="bg-yellow-500 hover:bg-yellow-600 text-white p-2 rounded-full" title="Unlog Set"><RotateCcw size={20} /></button>
-                                    )}
-                                </div>
-                            )}
-                            {exercise.setType === SET_TYPES.DROPSET && (
-                                <div className="space-y-2">
-                                    <span className="text-gray-300 font-medium block text-center">Set {setIndex + 1} (Dropset)</span>
-                                    {(exercise.drops || []).map((drop, dropIdx) => (
-                                        <div key={dropIdx} className="flex items-center space-x-1 text-xs">
-                                            <span className="text-gray-400 w-1/4">Drop {dropIdx + 1}:</span>
-                                            <input type="number" placeholder="lbs" value={(set.drops && set.drops[dropIdx]?.weight) || ''} onChange={e => onSetInputChange(exIndex, setIndex, 'drops', {index: dropIdx, field: 'weight', value: e.target.value})} className="w-1/3 bg-gray-600 p-1 rounded"/>
-                                            <input type="number" placeholder="reps" value={(set.drops && set.drops[dropIdx]?.reps) || ''} onChange={e => onSetInputChange(exIndex, setIndex, 'drops', {index: dropIdx, field: 'reps', value: e.target.value})} className="w-1/3 bg-gray-600 p-1 rounded"/>
-                                        </div>
-                                    ))}
-                                    {!set.completed && (
-                                        <button onClick={() => onLogSet(exIndex, setIndex, {drops: set.drops})} className="mt-2 w-full bg-green-500 hover:bg-green-600 text-white py-1 px-3 rounded-md text-sm">Log Dropset</button>
-                                    )}
-                                    {set.completed && (
-                                        <button onClick={() => onUnlogSet(exIndex, setIndex)} className="mt-2 w-full bg-yellow-500 hover:bg-yellow-600 text-white py-1 px-3 rounded-md text-sm">Unlog Dropset</button>
-                                    )}
-                                </div>
-                            )}
-                        </div>
-                    ))}
+                            </div>
+                        )}
 
-                    {!exercise.isSkipped && (
-                        <button onClick={() => onAddSetToExercise(exIndex)} className="w-full text-sm text-blue-400 hover:text-blue-300 border border-blue-500 hover:border-blue-400 rounded-lg py-1.5 px-3 mt-1 flex items-center justify-center transition-colors">
-                           <PlusCircle size={16} className="mr-1"/> Add Set
-                        </button>
-                    )}
-                </div>
-            ))}
+                        {!exercise.isSkipped && exercise.loggedSets.map((set, setIndex) => (
+                            <div key={`${exercise.id}-set-${setIndex}`} className={`p-3 rounded-md mb-2 ${set.completed ? 'bg-green-800 border-green-600' : 'bg-gray-700 border-gray-600'} border`}>
+                                { (exercise.setType === SET_TYPES.STANDARD || exercise.setType === SET_TYPES.WARMUP || exercise.setType === SET_TYPES.AMRAP) && (
+                                    <div className="flex items-center space-x-2">
+                                        <span className="text-gray-300 font-medium w-8 text-center">Set {setIndex + 1}</span>
+                                        <input type="number" placeholder="Reps" value={set.reps || ''} onChange={(e) => onSetInputChange(exIndex, setIndex, 'reps', e.target.value)} className="bg-gray-600 text-white border border-gray-500 rounded-full w-20 h-12 text-center text-lg"/>
+                                        <span className="text-gray-400">x</span>
+                                        <input type="number" placeholder="lbs" value={set.weight || ''} onChange={(e) => onSetInputChange(exIndex, setIndex, 'weight', e.target.value)} className="bg-gray-600 text-white border border-gray-500 rounded-full w-20 h-12 text-center text-lg"/>
+                                        {!set.completed && (set.reps || set.weight) && (
+                                            <button onClick={() => onLogSet(exIndex, setIndex, {reps: set.reps, weight: set.weight})} className="bg-green-500 hover:bg-green-600 text-white p-2 rounded-full" title="Log Set"><CheckCircle size={20} /></button>
+                                        )}
+                                        {set.completed && (
+                                            <button onClick={() => onUnlogSet(exIndex, setIndex)} className="bg-yellow-500 hover:bg-yellow-600 text-white p-2 rounded-full" title="Unlog Set"><RotateCcw size={20} /></button>
+                                        )}
+                                    </div>
+                                )}
+                                {exercise.setType === SET_TYPES.TIMED && (
+                                    <div className="flex flex-col items-center space-y-2">
+                                        <span className="text-gray-300 font-medium">Set {setIndex + 1}: Target {exercise.targetDuration}s</span>
+                                        {inSetTimer && inSetTimer.exerciseIndex === exIndex && inSetTimer.setIndex === setIndex ? (
+                                            <div className="text-2xl text-pink-400">{formatTime(inSetTimer.secondsLeft)}</div>
+                                        ) : (
+                                            <input type="number" placeholder="Actual (s)" value={set.durationAchieved || ''} onChange={(e) => onSetInputChange(exIndex, setIndex, 'durationAchieved', e.target.value)} className="bg-gray-600 text-white border border-gray-500 rounded-full w-24 h-10 text-center"/>
+                                        )}
+                                        {!set.completed && !(inSetTimer && inSetTimer.exerciseIndex === exIndex && inSetTimer.setIndex === setIndex) && (
+                                            <button onClick={() => onStartInSetTimer(exIndex, setIndex, exercise.targetDuration)} className="bg-blue-500 hover:bg-blue-600 text-white py-1 px-3 rounded-md text-sm">Start Set Timer</button>
+                                        )}
+                                        {!set.completed && (set.durationAchieved) && (
+                                            <button onClick={() => onLogSet(exIndex, setIndex, {durationAchieved: set.durationAchieved})} className="bg-green-500 hover:bg-green-600 text-white p-2 rounded-full" title="Log Timed Set"><CheckCircle size={20} /></button>
+                                        )}
+                                        {set.completed && (
+                                            <button onClick={() => onUnlogSet(exIndex, setIndex)} className="bg-yellow-500 hover:bg-yellow-600 text-white p-2 rounded-full" title="Unlog Set"><RotateCcw size={20} /></button>
+                                        )}
+                                    </div>
+                                )}
+                                {exercise.setType === SET_TYPES.DROPSET && (
+                                    <div className="space-y-2">
+                                        <span className="text-gray-300 font-medium block text-center">Set {setIndex + 1} (Dropset)</span>
+                                        {(exercise.drops || []).map((drop, dropIdx) => (
+                                            <div key={dropIdx} className="flex items-center space-x-1 text-xs">
+                                                <span className="text-gray-400 w-1/4">Drop {dropIdx + 1}:</span>
+                                                {/* Ensure that onSetInputChange correctly handles nested 'drops' array updates */}
+                                                <input type="number" placeholder="lbs" value={(set.drops && set.drops[dropIdx]?.weight) || ''} onChange={e => onSetInputChange(exIndex, setIndex, 'drops', { index: dropIdx, field: 'weight', value: e.target.value }, dropIdx)} className="w-1/3 bg-gray-600 p-1 rounded"/>
+                                                <input type="number" placeholder="reps" value={(set.drops && set.drops[dropIdx]?.reps) || ''} onChange={e => onSetInputChange(exIndex, setIndex, 'drops', { index: dropIdx, field: 'reps', value: e.target.value }, dropIdx)} className="w-1/3 bg-gray-600 p-1 rounded"/>
+                                            </div>
+                                        ))}
+                                        {!set.completed && (
+                                            <button onClick={() => onLogSet(exIndex, setIndex, {drops: set.drops})} className="mt-2 w-full bg-green-500 hover:bg-green-600 text-white py-1 px-3 rounded-md text-sm">Log Dropset</button>
+                                        )}
+                                        {set.completed && (
+                                            <button onClick={() => onUnlogSet(exIndex, setIndex)} className="mt-2 w-full bg-yellow-500 hover:bg-yellow-600 text-white py-1 px-3 rounded-md text-sm">Unlog Dropset</button>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        ))}
+
+                        {!exercise.isSkipped && (
+                            <button onClick={() => onAddSetToExercise(exIndex)} className="w-full text-sm text-blue-400 hover:text-blue-300 border border-blue-500 hover:border-blue-400 rounded-lg py-1.5 px-3 mt-1 flex items-center justify-center transition-colors">
+                               <PlusCircle size={16} className="mr-1"/> Add Set
+                            </button>
+                        )}
+                    </div>
+                )
+            })}
             {(activeWorkout.exercises || []).length === 0 && <p className="text-sm text-gray-400 text-center py-2">No exercises in this workout.</p>}
 
             <div className="my-6 bg-gray-800 p-4 rounded-lg">
