@@ -2,6 +2,7 @@ import React from 'react';
 import { Edit, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
 
 // It's highly recommended to move SET_TYPES to a shared utility file
+// and import it here (e.g., import { SET_TYPES } from '../utils/helpers';)
 const SET_TYPES = {
     STANDARD: 'standard',
     WARMUP: 'warmup',
@@ -12,7 +13,7 @@ const SET_TYPES = {
 
 const WorkoutHistoryScreen = React.memo(({
     workoutLogs,
-    onEditWorkoutPlanFromLog,
+    onEditWorkoutLog,
     onDeleteWorkoutLog
 }) => (
     <div className="p-4 md:p-6">
@@ -35,9 +36,9 @@ const WorkoutHistoryScreen = React.memo(({
                             <div className="flex space-x-1">
                                 {log.templateId && (
                                     <button
-                                        onClick={() => onEditWorkoutPlanFromLog(log.templateId)}
+                                        onClick={() => onEditWorkoutLog(log)}
                                         className="p-1 text-blue-400 hover:text-blue-300"
-                                        title="Edit Original Plan"
+                                        title="Edit This Workout Log"
                                     >
                                         <Edit size={16}/>
                                     </button>
@@ -63,16 +64,24 @@ const WorkoutHistoryScreen = React.memo(({
                                 {ex.isSkipped ? <span className="ml-2 text-xs bg-yellow-600 px-1.5 py-0.5 rounded">Skipped</span> : ''}
                             </summary>
                             <div className="pl-6 pt-1 pb-2 text-xs text-gray-400 border-l border-gray-700 ml-2">
-                                {(ex.loggedSets || []).map((s, sIdx) => (
-                                    <div key={sIdx}>
-                                        Set {sIdx + 1}: {
-                                            ex.setType === SET_TYPES.TIMED ? `${s.durationAchieved || 'N/A'}s` :
-                                            ex.setType === SET_TYPES.DROPSET ? 
-                                                (s.drops || []).map((d, dIdx) => `${d.reps || 'N/A'}r @ ${d.weight || 'N/A'}lbs`).join(' / ') || 'N/A' :
-                                            `${s.reps || 'N/A'} reps @ ${s.weight || 'N/A'} lbs`
-                                        }
-                                    </div>
-                                ))}
+                                {(ex.loggedSets || []).map((s, sIdx) => {
+                                    let setDisplayString;
+                                    if (ex.setType === SET_TYPES.TIMED) {
+                                        setDisplayString = `${s.durationAchieved || 'N/A'}s`;
+                                    } else if (ex.setType === SET_TYPES.DROPSET) {
+                                        const dropsText = (s.drops || [])
+                                            .map(d => `${d.reps || 'N/A'}r @ ${d.weight || 'N/A'}lbs`)
+                                            .join(' / ');
+                                        setDisplayString = dropsText || 'N/A';
+                                    } else { // Standard, Warmup, AMRAP
+                                        setDisplayString = `${s.reps || 'N/A'} reps @ ${s.weight || 'N/A'} lbs`;
+                                    }
+                                    return (
+                                        <div key={sIdx}>
+                                            Set {sIdx + 1}: {setDisplayString}
+                                        </div>
+                                    );
+                                })}
                                 {(ex.loggedSets || []).length === 0 && !ex.isSkipped && <div>No sets logged for this exercise.</div>}
                             </div>
                         </details>

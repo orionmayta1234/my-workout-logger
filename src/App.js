@@ -33,6 +33,7 @@ import HomeScreen from './components/HomeScreen';
 import CreateEditWorkoutScreen from './components/CreateEditWorkoutScreen';
 import ActiveWorkoutScreen from './components/ActiveWorkoutScreen';
 import WorkoutHistoryScreen from './components/WorkoutHistoryScreen';
+import EditWorkoutLogScreen from './components/EditWorkoutLogScreen'; // New import
 import TimerDisplay from './components/TimerDisplay';
 import Modal from './components/Modal';
 
@@ -68,7 +69,8 @@ function App() {
     const [workouts, setWorkouts] = useState([]);
     const [activeWorkout, setActiveWorkout] = useState(null);
     const [currentScreen, setCurrentScreen] = useState('home');
-    const [editingWorkout, setEditingWorkout] = useState(null);
+    const [editingWorkout, setEditingWorkout] = useState(null); // For plan templates
+    const [editingLogDetails, setEditingLogDetails] = useState(null); // For specific workout logs
     const [workoutLogs, setWorkoutLogs] = useState([]);
     
     const [infoModalMessage, setInfoModalMessage] = useState('');
@@ -109,7 +111,7 @@ function App() {
     useEffect(() => { if (!("Notification" in window)) { console.log("This browser does not support desktop notification"); } else if (Notification.permission !== "denied") { Notification.requestPermission().then(permission => { setNotificationPermission(permission); }); } }, []);
     
     // --- Firebase Initialization and Auth Listener ---
-    useEffect(() => { try { const app = initializeApp(firebaseConfig); const firestoreDb = getFirestore(app); const firebaseAuth = getAuth(app); setDb(firestoreDb); setAuth(firebaseAuth); const unsubscribe = onAuthStateChanged(firebaseAuth, (currentUser) => { setUser(currentUser); setIsAuthReady(true); if (!currentUser) { setCurrentScreen('home'); setWorkouts([]); setWorkoutLogs([]); setActiveWorkout(null); setEditingWorkout(null); } }); return () => unsubscribe(); } catch (error) { console.error("Error initializing Firebase:", error); setIsAuthReady(true); } }, []);
+    useEffect(() => { try { const app = initializeApp(firebaseConfig); const firestoreDb = getFirestore(app); const firebaseAuth = getAuth(app); setDb(firestoreDb); setAuth(firebaseAuth); const unsubscribe = onAuthStateChanged(firebaseAuth, (currentUser) => { setUser(currentUser); setIsAuthReady(true); if (!currentUser) { setCurrentScreen('home'); setWorkouts([]); setWorkoutLogs([]); setActiveWorkout(null); setEditingWorkout(null); setEditingLogDetails(null); } }); return () => unsubscribe(); } catch (error) { console.error("Error initializing Firebase:", error); setIsAuthReady(true); } }, []);
     const userId = user ? user.uid : null;
 
     // --- Google Sign-In/Out Handlers ---
@@ -201,9 +203,7 @@ function App() {
                     shouldStartMainRestTimer = false; 
                     showSupersetMessage = true;
                 }
-                // If not all sets are done for THIS exercise in the superset, timer will run (shouldStartMainRestTimer is true)
             }
-            // If it's not supersetWithNext (standalone or last in a superset), timer always runs.
     
             if (shouldStartMainRestTimer) {
                 startTimer(); 
@@ -221,6 +221,45 @@ function App() {
     const handleFinishWorkout = useCallback(async () => { if (!db || !userId || !activeWorkout) return; const finalBodyWeight = bodyWeight || activeWorkout.bodyWeight || ''; const finalNotes = workoutNotes || activeWorkout.notes || ''; const workoutLog = { ...activeWorkout, bodyWeight: finalBodyWeight, notes: finalNotes, endTime: new Date(), isCompleted: true, exercises: activeWorkout.exercises.map(ex => ({ ...ex, loggedSets: ex.loggedSets.filter(s => s.completed || ex.isSkipped) })) }; try { await addDoc(collection(db, `artifacts/${appId}/users/${userId}/workoutLogs`), workoutLog); setActiveWorkout(null); setCurrentScreen('home'); stopTimer(); setBodyWeight(''); setWorkoutNotes(''); setShowBodyWeightInput(false); } catch (error) { console.error("Error finishing workout:", error); showInfoModal("Error saving workout log: " + (String(error.message) || "Unknown error")); } }, [db, userId, activeWorkout, bodyWeight, workoutNotes, stopTimer, showInfoModal]);
     const handleCancelActiveWorkout = useCallback(() => { setActiveWorkout(null); setCurrentScreen('home'); stopTimer(); setReplacingExerciseIndex(null); setTempReplaceName(''); }, [stopTimer]);
     const handleCancelCreateEdit = useCallback(() => { setEditingWorkout(null); setCurrentScreen('home'); }, []);
+    
+    // --- Workout Log Editing Handlers ---
+    const handleStartEditWorkoutLog = useCallback((logData) => {
+        console.log("Starting to edit log:", logData);
+        setEditingLogDetails(logData);
+        setCurrentScreen('editWorkoutLog');
+    }, []);
+
+    const handleSaveEditedWorkoutLog = useCallback(async (updatedLog) => {
+        if (!db || !userId || !updatedLog || !updatedLog.id) {
+            showInfoModal("Error: Cannot save log. Missing information.");
+            return;
+        }
+        try {
+            const logDocRef = doc(db, `artifacts/${appId}/users/${userId}/workoutLogs`, updatedLog.id);
+            // Ensure timestamps are correctly formatted if they were converted to JS Dates for editing
+            const logToSave = { ...updatedLog };
+            if (logToSave.startTime && typeof logToSave.startTime.getMonth === 'function') { // Check if it's a JS Date
+                // Firestore handles JS Date objects automatically
+            }
+            if (logToSave.endTime && typeof logToSave.endTime.getMonth === 'function') {
+                // Firestore handles JS Date objects automatically
+            }
+
+            await setDoc(logDocRef, logToSave, { merge: true }); // Use setDoc with merge to update
+            showInfoModal("Workout log updated successfully!");
+            setCurrentScreen('workoutHistory');
+            setEditingLogDetails(null);
+        } catch (error) {
+            console.error("Error updating workout log:", error);
+            showInfoModal("Failed to update workout log: " + (String(error.message) || "Unknown error"));
+        }
+    }, [db, userId, showInfoModal]);
+
+    const handleCancelEditLog = useCallback(() => {
+        setEditingLogDetails(null);
+        setCurrentScreen('workoutHistory');
+    }, []);
+
     const handleEditWorkoutPlanFromLog = useCallback(async (templateId) => { if (!db || !userId || !templateId) { showInfoModal("Cannot find original plan: Missing template information from log."); return; } try { const templateDocRef = doc(db, `artifacts/${appId}/users/${userId}/workouts`, templateId); const templateSnap = await getDoc(templateDocRef); if (templateSnap.exists()) { handleEditWorkoutTemplate({ id: templateSnap.id, ...templateSnap.data() }); } else { showInfoModal("Original workout plan not found. It may have been deleted."); } } catch (error) { console.error("Error fetching workout plan for editing:", error); showInfoModal("Error fetching plan: " + (String(error.message) || "Unknown error")); } }, [db, userId, handleEditWorkoutTemplate, showInfoModal]); 
     const requestDeleteWorkoutLog = useCallback((logId) => { setItemToDelete({ id: logId, type: 'log' }); setConfirmModalMessage("Are you sure you want to delete this workout log? This action cannot be undone."); setIsConfirmModalOpen(true); }, []);
     const handleConfirmDelete = useCallback(async () => { if (!db || !userId || !itemToDelete) { showInfoModal("Cannot delete: Missing required information."); setIsConfirmModalOpen(false); setItemToDelete(null); return; } const { id, type } = itemToDelete; let collectionPath = ''; let successMessage = ''; let errorMessagePrefix = ''; if (type === 'template') { collectionPath = `artifacts/${appId}/users/${userId}/workouts`; successMessage = "Workout plan deleted successfully."; errorMessagePrefix = "Error deleting template: "; } else if (type === 'log') { collectionPath = `artifacts/${appId}/users/${userId}/workoutLogs`; successMessage = "Workout log deleted successfully."; errorMessagePrefix = "Error deleting log: "; } else { showInfoModal("Invalid item type for deletion."); setIsConfirmModalOpen(false); setItemToDelete(null); return; } try { await deleteDoc(doc(db, collectionPath, id)); console.log(successMessage); } catch (error) { console.error(`Raw error object during delete ${type}:`, error); let detailMessage = "An unknown error occurred."; if (error) { if (typeof error.message === 'string' && error.message.trim() !== '') { detailMessage = error.message; } else if (typeof error === 'string' && error.trim() !== '') { detailMessage = error; } else { try { const errStr = JSON.stringify(error); if (errStr !== '{}') detailMessage = errStr; } catch (e) { /* ignore */ } } } showInfoModal(errorMessagePrefix + detailMessage); } finally { setIsConfirmModalOpen(false); setItemToDelete(null); } }, [db, userId, itemToDelete, showInfoModal]);
@@ -250,7 +289,8 @@ function App() {
             case 'home': return <HomeScreen workouts={workouts} onStartWorkout={handleStartWorkout} onEditWorkoutTemplate={handleEditWorkoutTemplate} onDeleteWorkoutTemplate={requestDeleteWorkoutTemplate} onCreateNewWorkout={handleCreateNewWorkout} onWorkoutPlanDragStart={handleWorkoutPlanDragStart} onWorkoutPlanDragOver={handleWorkoutPlanDragOver} onWorkoutPlanDrop={handleWorkoutPlanDrop} onWorkoutPlanDragEnd={handleWorkoutPlanDragEnd} onWorkoutPlanTouchStart={handleWorkoutPlanTouchStart} onWorkoutPlanTouchMove={handleWorkoutPlanTouchMoveCallback} onWorkoutPlanTouchEnd={handleWorkoutPlanTouchEndCallback} />; 
             case 'createWorkout': return <CreateEditWorkoutScreen editingWorkout={editingWorkout} onWorkoutNameChange={handleWorkoutNameChange} onExerciseChange={handleExerciseChange} onAddExerciseToTemplate={addExerciseToTemplate} onRemoveExerciseFromTemplate={removeExerciseFromTemplate} onSaveWorkoutTemplate={handleSaveWorkoutTemplate} onCancel={handleCancelCreateEdit} onExerciseDragStart={handleExerciseDragStart} onExerciseDragOver={handleExerciseDragOver} onExerciseDrop={handleExerciseDrop} onExerciseDragEnd={handleExerciseDragEnd} onExerciseTouchStart={handleExerciseTouchStart} onExerciseTouchMove={handleExerciseTouchMoveCallback} onExerciseTouchEnd={handleExerciseTouchEndCallback} />; 
             case 'activeWorkout': return <ActiveWorkoutScreen activeWorkout={activeWorkout} bodyWeight={bodyWeight} workoutNotes={workoutNotes} onSetBodyWeight={setBodyWeight} onSetWorkoutNotes={setWorkoutNotes} onSetInputChange={handleSetInputChange} onAddSetToExercise={handleAddSetToExercise} onLogSet={handleLogSet} onUnlogSet={handleUnlogSet} onFinishWorkout={handleFinishWorkout} onCancelWorkout={handleCancelActiveWorkout} showBodyWeightInput={showBodyWeightInput} onHideBodyWeightInput={() => setShowBodyWeightInput(false)} onToggleSkipExercise={handleToggleSkipExercise} onStartReplaceExercise={handleStartReplaceExercise} replacingExerciseIndex={replacingExerciseIndex} onConfirmReplaceExercise={handleConfirmReplaceExercise} onCancelReplaceExercise={handleCancelReplaceExercise} tempReplaceName={tempReplaceName} onSetTempReplaceName={setTempReplaceName} onStartInSetTimer={handleStartInSetTimer} inSetTimer={inSetTimer} formatTime={formatTime} />; 
-            case 'workoutHistory': return <WorkoutHistoryScreen workoutLogs={workoutLogs} onEditWorkoutPlanFromLog={handleEditWorkoutPlanFromLog} onDeleteWorkoutLog={requestDeleteWorkoutLog} />; 
+            case 'workoutHistory': return <WorkoutHistoryScreen workoutLogs={workoutLogs} onEditWorkoutLog={handleStartEditWorkoutLog} onDeleteWorkoutLog={requestDeleteWorkoutLog} />; 
+            case 'editWorkoutLog': return <EditWorkoutLogScreen logToEdit={editingLogDetails} onSaveEditedLog={handleSaveEditedWorkoutLog} onCancelEditLog={handleCancelEditLog} formatTime={formatTime} />;
             default: setCurrentScreen('home'); return <HomeScreen workouts={workouts} onStartWorkout={handleStartWorkout} onEditWorkoutTemplate={handleEditWorkoutTemplate} onDeleteWorkoutTemplate={requestDeleteWorkoutTemplate} onCreateNewWorkout={handleCreateNewWorkout} onWorkoutPlanDragStart={handleWorkoutPlanDragStart} onWorkoutPlanDragOver={handleWorkoutPlanDragOver} onWorkoutPlanDrop={handleWorkoutPlanDrop} onWorkoutPlanDragEnd={handleWorkoutPlanDragEnd} onWorkoutPlanTouchStart={handleWorkoutPlanTouchStart} onWorkoutPlanTouchMove={handleWorkoutPlanTouchMoveCallback} onWorkoutPlanTouchEnd={handleWorkoutPlanTouchEndCallback} />; 
         } 
     };
